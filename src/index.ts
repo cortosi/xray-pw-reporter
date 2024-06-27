@@ -65,7 +65,7 @@ export default class XrayPwReporter implements Reporter {
      * @param {ReporterOptions} options - The options for configuring the Xray integrator.
      */
     constructor(private readonly options: ReporterOptions) {
-        this.reportPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xrayIntegrator/xray-report.json"
+        this.reportPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xray-pw-reporter/xray-report.json"
         this.xrayService = new XrayService(options)
         this.validateOptions()
     }
