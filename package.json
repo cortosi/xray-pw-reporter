@@ -1,6 +1,6 @@
 {
   "name": "xray-pw-reporter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A module to integrate Playwright test execution result with Xray",
   "homepage": "https://github.com/cortosi/xray-pw-reporter",
   "repository": {
