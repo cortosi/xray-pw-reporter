@@ -1,0 +1,30 @@
+{
+  "name": "xray-pw-reporter",
+  "version": "0.1.0",
+  "description": "A module to integrate Playwright test execution result with Xray",
+  "homepage": "https://github.com/cortosi/xray-pw-reporter",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cortosi/xray-pw-reporter"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "playwright",
+    "xray",
+    "reporter"
+  ],
+  "author": "Vittorio Cortosi (https://github.com/cortosi)",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.4.3",
+    "@babel/types": "^7.20.0",
+    "@types/babel__types": "^7.20.0",
+    "@playwright/test": "^1.20.0",
+    "chalk": "^4.1.2",
+    "@types/chalk": "^4.1.2"
+  }
+}
