@@ -17,6 +17,7 @@ import XrayService from './XrayService'
 
 // Constants
 const DDT_TITLE_REGEX: RegExp = /([\w\W]*)\s*->\s*Iteration ([1-9]\d*|1\d+)/
+let interrupted: boolean = false
 
 export enum Status {
     PASSED = 'passed',
@@ -469,32 +470,32 @@ export default class XrayPwReporter implements Reporter {
 
     async onEnd(result: FullResult) {
         console.log(xrayLog("\nExecution done.\n\n"))
-        for (const [, test] of this.testMap.entries()) {
-            if (test.testType === "DDT") {
-                test.xrayTest.status = this.determineDDTStatus(test)
-            }
-            this.xrayReport.tests.push(test.xrayTest)
-        }
 
-        // Saving report locally
-        await this.saveReportLocally()
-
-        if (this.options.importType == "REST") {
-            try {
-                await this.xrayService.uploadExecution(this.xrayReport)
-            } catch (error) {
-                if (error instanceof Error) {
-                    console.log(error.message)
-                    process.exit(1)
+        if (!interrupted) {
+            for (const [, test] of this.testMap.entries()) {
+                if (test.testType === "DDT") {
+                    test.xrayTest.status = this.determineDDTStatus(test)
                 }
+                this.xrayReport.tests.push(test.xrayTest)
             }
-        } else
-            console.log(xrayLog("created successfully.⚡"))
+
+            // Saving report locally
+            await this.saveReportLocally()
+
+            if (this.options.importType == "REST") {
+                try {
+                    await this.xrayService.uploadExecution(this.xrayReport)
+                } catch (error) {
+                    if (error instanceof Error) {
+                        console.log(error.message)
+                    }
+                }
+            } else
+                console.log(xrayLog("created successfully.⚡"))
+        }
     }
 }
 
-// Handling Interrupts
-process.on('SIGINT', async () => {
-    process.exit(0)
+process.addListener("SIGINT", () => {
+    interrupted = true
 })
-

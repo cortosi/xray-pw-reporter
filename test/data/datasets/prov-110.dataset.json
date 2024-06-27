@@ -1,0 +1,68 @@
+{
+    "dataset": [
+        {
+            "parameters": [
+                {
+                    "name": "username",
+                    "value": ""
+                },
+                {
+                    "name": "password",
+                    "value": "ciao"
+                },
+                {
+                    "name": "error",
+                    "value": "enter username"
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "username",
+                    "value": "ciao@ciao.com"
+                },
+                {
+                    "name": "password",
+                    "value": ""
+                },
+                {
+                    "name": "error",
+                    "value": "enter password"
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "username",
+                    "value": "ciao@ciao"
+                },
+                {
+                    "name": "password",
+                    "value": "ciao"
+                },
+                {
+                    "name": "error",
+                    "value": "email not valid"
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "username",
+                    "value": "ciao@ciao.com"
+                },
+                {
+                    "name": "password",
+                    "value": "omegalul"
+                },
+                {
+                    "name": "error",
+                    "value": "invalid password"
+                }
+            ]
+        }
+    ]
+}

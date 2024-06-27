@@ -3,10 +3,6 @@ import { ReporterOptions } from ".";
 import { XrayImportResponse } from "./types/Xray/XrayImportResponse";
 import { XrayJson } from "./types/Xray/XrayJson";
 
-process.on('SIGINT', async () => {
-    process.exit(0); // Uscita dal processo con successo
-});
-
 export default class XrayService {
     private authToken: string = '';
     private JIRA_URL_REGEX = /https:\/\/([^.\/]+\.atlassian\.net)/
@@ -83,7 +79,7 @@ export default class XrayService {
 
             const jiraUrl = await this.extractJiraURL(jsonResponse.self)
 
-            console.log((`\n\t ❇️  Results imported in the issue: ${jsonResponse.key} -> https://${jiraUrl}/browse/${jsonResponse.key}❇️\n`))
+            console.log((`\n\t ❇️  Results imported in the issue: ${jsonResponse.key} -> https://${jiraUrl}/browse/${jsonResponse.key} ❇️\n`))
         }
     }
 }

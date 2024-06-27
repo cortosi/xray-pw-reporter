@@ -1,0 +1,28 @@
+{
+    "dataset": [
+        {
+            "parameters": [
+                {
+                    "name": "nomeCartella",
+                    "value": ""
+                },
+                {
+                    "name": "error",
+                    "value": "enter nome"
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "nomeCartella",
+                    "value": "!!!!"
+                },
+                {
+                    "name": "error",
+                    "value": "No special char"
+                }
+            ]
+        }
+    ]
+}
