@@ -1,27 +1,4 @@
 
-# xray-pw-reporter
-
-## Overview
-
-xray-pw-reporter is a node module designed to import test execution results into Xray, a popular test management tool for Jira. This project facilitates seamless integration and automated reporting of test outcomes, enhancing your test management workflow.
-**⚠️ Only works for Cloud versions ⚠️**
-
-
-
-
-## Features
-
-- Automated Import: Automatically import test execution results into Xray.
-- Customization: Supports customizable configurations to fit your specific needs.
-
-## Installation
-
-Install my-project with npm
-
-```bash
-  npm install xray-pw-reporter
-```
-    
 ## Usage/Examples
 
 ```typescript
@@ -99,7 +76,8 @@ test('Test that passes', async ({ page }) => {
 
 For data driven tests (which correspond to tests with xray datasets), the matter is a little more complex:
 
-- Dataset mush follow the syntax below:
+- A file name: "<jirakey>.dataset.json" have to be created under /data/datasets/ 
+- Dataset must follow the syntax below:
 
 ```json
 {
@@ -141,11 +119,12 @@ For data driven tests (which correspond to tests with xray datasets), the matter
 ```
 
 - `@DDT`annotation must be specified above the test:
-- ⚠️**Test title must follow the syntax: "TEST_NAME -> Iteration X"**⚠️
+- ⚠️**Test title must follow the syntax: TEST_NAME -> Iteration X**⚠️
+- ⚠️**the dataset file name must be the same as the @DDT tag**⚠️
 
 ```typescript
 import { test, expect } from '@playwright/test';
-import { dataset as ds110 } from "../data/datasets/prov-110.dataset.json"
+import { dataset as ds110 } from "../data/datasets/jkey-110.dataset.json"
 
 ds110.forEach((item, index) => {
     /**
@@ -160,7 +139,3 @@ ds110.forEach((item, index) => {
 ## Override Test Details
 
 With option `overrideTestDetail` set to true, title and steps defined on PW test, will replace title and steps on Xray Issue. So, be carefull on using it :)
-## DDT Demo
-
-https://github.com/cortosi/xray-pw-reporter/assets/73166428/fc8f49c4-dc73-47a6-8f0b-9469ac32eceb
-
