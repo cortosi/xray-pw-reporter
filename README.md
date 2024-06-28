@@ -157,9 +157,10 @@ ds110.forEach((item, index) => {
     })
 })
 ```
+## Override Test Details
+
+With option `overrideTestDetail` set to true, title and steps defined on PW test, will replace title and steps on Xray Issue. So, be carefull on using it :)
 ## DDT Demo
 
 https://github.com/cortosi/xray-pw-reporter/assets/73166428/fc8f49c4-dc73-47a6-8f0b-9469ac32eceb
-
-
 
