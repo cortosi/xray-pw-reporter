@@ -1,10 +1,12 @@
 import { TestResult } from "@playwright/test/reporter";
 import { XrayParameter } from "./types/Xray/XrayParameter";
-import chalk = require("chalk");
+const clc = require("cli-color");
 
-export const xrayLog = chalk.hex("#363636").bold
-export const xrayErrorLog = chalk.redBright.bold
-export const xrayWarningLog = chalk.yellow.bold
+export const xrayLog = clc.blackBright.bold
+export const xrayErrorLog = clc.redBright.bold
+export const xrayWarningLog = clc.yellow.bold
+export const xrayPassedTest = clc.greenBright.bold
+export const xrayFailedTest = clc.redBright.bold
 
 export class Logger {
     static logTestResult(test: any, result: TestResult, comments?: { [key: string]: string }, ddtParams?: XrayParameter[]): void {
@@ -24,11 +26,11 @@ export class Logger {
 
         switch (result.status) {
             case "passed":
-                console.log(chalk.bold.green(`\t✅ ${test._projectId} ✅ ` + coloredOutput) + nonColoredOutput);
+                console.log(xrayPassedTest(`\t✅ ${test._projectId} ✅ ` + coloredOutput) + nonColoredOutput);
                 break;
             case "failed":
             case "timedOut":
-                console.log(chalk.bold.red(`\t❌ ${test._projectId} ❌ ` + coloredOutput) + nonColoredOutput);
+                console.log(xrayFailedTest(`\t❌ ${test._projectId} ❌ ` + coloredOutput) + nonColoredOutput);
                 break;
             case "skipped":
                 console.log(`\t⏩ ${test._projectId} ⏩ ` + coloredOutput + nonColoredOutput);

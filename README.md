@@ -1,8 +1,10 @@
+
 # xray-pw-reporter
 
 ## Overview
 
 xray-pw-reporter is a node module designed to import test execution results into Xray, a popular test management tool for Jira. This project facilitates seamless integration and automated reporting of test outcomes, enhancing your test management workflow.
+**⚠️ Only works for Cloud versions ⚠️**
 
 
 
@@ -66,6 +68,8 @@ reporter: [
 ]
 ```
 
+### Normal Tests
+
 For a normal test, you just have to indicate the JiraIssue as a comment above the test:
 
 ```typescript
@@ -76,4 +80,86 @@ test('Test that passes', async ({ page }) => {
     // Steps here
 })
 ```
-## Demo
+
+if `test.step` have also been defined, the results of the latter will also be included:
+
+```typescript
+/**
+ * @JiraIssue JKEY-10
+ */
+test('Test that passes', async ({ page }) => {
+    await test.step('Step 1', async () => {
+        // Implementation of step 1
+    })
+})
+```
+**⚠️Only steps wrapped into `test.step` will be included⚠️**
+
+### Data driven Tests
+
+For data driven tests (which correspond to tests with xray datasets), the matter is a little more complex:
+
+- Dataset mush follow the syntax below:
+
+```json
+{
+    "dataset": [
+        {
+            "parameters": [
+                {
+                    "name": "username",
+                    "value": ""
+                },
+                {
+                    "name": "password",
+                    "value": "hello"
+                },
+                {
+                    "name": "error",
+                    "value": "enter username"
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "username",
+                    "value": "hello@hello.com"
+                },
+                {
+                    "name": "password",
+                    "value": ""
+                },
+                {
+                    "name": "error",
+                    "value": "enter password"
+                }
+            ]
+        }
+    ]
+}
+```
+
+- `@DDT`annotation must be specified above the test:
+- ⚠️**Test title must follow the syntax: "TEST_NAME -> Iteration X"**⚠️
+
+```typescript
+import { test, expect } from '@playwright/test';
+import { dataset as ds110 } from "../data/datasets/prov-110.dataset.json"
+
+ds110.forEach((item, index) => {
+    /**
+     * @DDT JKEY-110
+     */
+    test(`Data-driven test with one step -> Iteration ${index + 1}`, async ({ page }) => {
+        await test.step('Step1', async () => {
+        })
+    })
+})
+```
+## DDT Demo
+
+https://github.com/cortosi/xray-pw-reporter/assets/73166428/fc8f49c4-dc73-47a6-8f0b-9469ac32eceb
+
+
+
