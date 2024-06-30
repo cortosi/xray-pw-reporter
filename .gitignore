@@ -31,3 +31,7 @@ Thumbs.db
 tmp/
 temp/
 
+# tests
+tests/*
+!tests/data/
+!tests/tests
