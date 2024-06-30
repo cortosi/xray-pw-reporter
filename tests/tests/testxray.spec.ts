@@ -1,8 +1,8 @@
 // import { test } from "@playwright/test"
-import { dataset as ds110 } from "./data/datasets/prov-110.dataset.json"
-import { dataset as ds111 } from "./data/datasets/prov-111.dataset.json"
-import { dataset as ds112 } from "./data/datasets/prov-112.dataset.json"
-import { dataset as ds113 } from "./data/datasets/prov-113.dataset.json"
+import { dataset as ds110 } from "../data/datasets/prov-110.dataset.json"
+import { dataset as ds111 } from "../data/datasets/prov-111.dataset.json"
+import { dataset as ds112 } from "../data/datasets/prov-112.dataset.json"
+import { dataset as ds113 } from "../data/datasets/prov-113.dataset.json"
 import { test } from "@playwright/test"
 
 test.describe('', { tag: "@testxray" }, () => {
@@ -92,7 +92,7 @@ test.describe('', { tag: "@testxray" }, () => {
         /**
          * @DDT PROV-110
          */
-        test(`Data-driven test without steps -> Iteration ${index + 1}`, async ({ page }) => {
+        test.only(`Data-driven test without steps -> Iteration ${index + 1}`, async ({ page }) => {
             // No steps defined
         })
     })
@@ -137,4 +137,22 @@ test.describe('', { tag: "@testxray" }, () => {
             })
         })
     })
+
+    ds113.forEach((item, index) => {
+        /**
+         * @DDT PROV-114
+         */
+        test(`Data-driven test with mixed stepss -> Iteration ${index + 1}`, async ({ page }) => {
+            await test.step('Step 1', async () => {
+                // Implementation of step 1
+            })
+            await test.step('Step 2', async () => {
+                if (index === 1) { // Fails only on the second iteration
+                    throw new Error('Error in step 2 of the second iteration')
+                }
+            })
+        })
+    })
 })
+
+

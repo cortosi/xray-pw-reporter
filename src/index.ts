@@ -443,7 +443,6 @@ export default class XrayPwReporter implements Reporter {
             } else {
                 testMapped = this.testMap.get(testKey) || new Test(testKey)
                 testMapped.xrayTest.status = result.status
-                this.testMap.set(testKey, testMapped)
             }
 
             if (result.error && result.attachments && result.attachments.length > 0) {
@@ -460,9 +459,9 @@ export default class XrayPwReporter implements Reporter {
                         summary: testSummary,
                     }
                 }
-
-                this.testMap.set(testKey, testMapped)
             }
+
+            this.testMap.set(testKey, testMapped)
         }
 
         Logger.logTestResult(test, result, this.getTestComments(test.location.file, test), ddtParameters)
