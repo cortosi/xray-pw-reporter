@@ -92,7 +92,7 @@ test.describe('', { tag: "@testxray" }, () => {
         /**
          * @DDT PROV-110
          */
-        test.only(`Data-driven test without steps -> Iteration ${index + 1}`, async ({ page }) => {
+        test(`Data-driven test that passes without steps -> Iteration ${index + 1}`, async ({ page }) => {
             // No steps defined
         })
     })
@@ -126,7 +126,7 @@ test.describe('', { tag: "@testxray" }, () => {
         /**
          * @DDT PROV-113
          */
-        test(`Data-driven test with mixed steps -> Iteration ${index + 1}`, async ({ page }) => {
+        test(`Data-driven test with mixed iterations (2 fails) -> Iteration ${index + 1}`, async ({ page }) => {
             await test.step('Step 1', async () => {
                 // Implementation of step 1
             })
@@ -138,21 +138,21 @@ test.describe('', { tag: "@testxray" }, () => {
         })
     })
 
-    ds113.forEach((item, index) => {
-        /**
-         * @DDT PROV-114
-         */
-        test(`Data-driven test with mixed stepss -> Iteration ${index + 1}`, async ({ page }) => {
-            await test.step('Step 1', async () => {
-                // Implementation of step 1
-            })
-            await test.step('Step 2', async () => {
-                if (index === 1) { // Fails only on the second iteration
-                    throw new Error('Error in step 2 of the second iteration')
-                }
-            })
-        })
-    })
+    // ds113.forEach((item, index) => {
+    //     /**
+    //      * @DDT PROV-114
+    //      */
+    //     test(`Data-driven test with mixed stepss -> Iteration ${index + 1}`, async ({ page }) => {
+    //         await test.step('Step 1', async () => {
+    //             // Implementation of step 1
+    //         })
+    //         await test.step('Step 2', async () => {
+    //             if (index === 1) { // Fails only on the second iteration
+    //                 throw new Error('Error in step 2 of the second iteration')
+    //             }
+    //         })
+    //     })
+    // })
 })
 
 

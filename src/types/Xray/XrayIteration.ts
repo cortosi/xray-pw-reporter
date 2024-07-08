@@ -29,5 +29,5 @@ export interface XrayIteration {
     /**
      * An array of step results (for Manual tests)
      */
-    steps?: XrayStepResult[],
+    steps: XrayStepResult[],
 }

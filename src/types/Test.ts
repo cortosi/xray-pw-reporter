@@ -2,15 +2,13 @@ import { XrayTest } from "./Xray/XrayTest"
 
 export class Test {
     private _testKey: string
-    private _testType: string
+    protected _testType: string
 
     private _xrayTest: XrayTest = {}
 
-    constructor(testKey: string, testType?: string, xrayTest?: XrayTest) {
+    constructor(testKey: string, xrayTest?: XrayTest) {
         this._testKey = testKey
-        this._testType = testType ?? "SD"
-        if (!(testKey == "OVERRIDE"))
-            this._xrayTest.testKey = testKey
+        this._testType = "SD"
     }
 
     get xrayTest(): XrayTest {
@@ -29,6 +27,7 @@ export class Test {
 export class DDT extends Test {
 
     constructor(testKey: string) {
-        super(testKey, "DDT")
+        super(testKey)
+        this._testType = "DDT"
     }
 }

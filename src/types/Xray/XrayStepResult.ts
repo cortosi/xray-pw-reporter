@@ -8,7 +8,7 @@ export default interface XrayStepResult {
     /**
      * The status for the test step (PASSED, FAILED, EXECUTING, TODO, custom statuses...)
      */
-    status?: string
+    status: string
 
     /**
      * The comment for the step result

@@ -1,42 +1,85 @@
-import { TestResult } from "@playwright/test/reporter";
-import { XrayParameter } from "./types/Xray/XrayParameter";
-const clc = require("cli-color");
+import { TestResult } from "@playwright/test/reporter"
+import { Mutex } from "async-mutex"
+const clc = require("cli-color")
 
-export const xrayLog = clc.blackBright.bold
-export const xrayErrorLog = clc.redBright.bold
-export const xrayWarningLog = clc.yellow.bold
-export const xrayPassedTest = clc.greenBright.bold
-export const xrayFailedTest = clc.redBright.bold
+const xrayLog = clc.blackBright.bold
+const xrayErrorLog = clc.redBright.bold
+const xrayWarningLog = clc.yellow.bold
+const xrayPassedTest = clc.greenBright.bold
+const xrayFailedTest = clc.redBright.bold
 
 export class Logger {
-    static logTestResult(test: any, result: TestResult, comments?: { [key: string]: string }, ddtParams?: XrayParameter[]): void {
-        let coloredOutput: string;
-        let nonColoredOutput: string;
+    private static testProgressNumber: number = 1
+    public static totalTestsNumber: number = 0
 
-        if (ddtParams && comments) {
-            // Extracting values only
-            const values = ddtParams.map(param => param.value).join(', ');
+    private static incrProgress() {
+        const mutex = new Mutex()
 
-            coloredOutput = `${test.title} | DDT for test: ${test.parent.title} (${comments.DDT}) | `;
-            nonColoredOutput = values;
+        mutex
+            .waitForUnlock()
+            .then(() => {
+                Logger.testProgressNumber++
+            })
+    }
+
+    private static getProgress(): string {
+        return `${this.testProgressNumber}/${this.totalTestsNumber}\t`
+    }
+
+    private static notifyExcluded(issueKey?: string): string {
+        return issueKey ? '' : ` -${xrayWarningLog("⚡ Excluded.⚡")}`
+    }
+
+    private static formatDuration(milliseconds: number): string {
+        const seconds = milliseconds / 1000
+
+        if (seconds >= 60) {
+            const minutes = seconds / 60
+            return `${minutes.toFixed(1)}m`
+        } else if (seconds >= 1) {
+            return `${Math.floor(seconds)}s`
         } else {
-            coloredOutput = `${test.title}`;
-            nonColoredOutput = '';
+            return `${milliseconds}msec`
         }
+    }
+
+    private static printTestSuccess(test: any, duration: number, issueKey?: string) {
+        console.log(this.getProgress() + xrayPassedTest(`✅ ${test._projectId} ✅ ` + test.title) + this.notifyExcluded(issueKey) + ` - ${this.formatDuration(duration)}`)
+    }
+
+    private static printTestFail(test: any, duration: number, issueKey?: string) {
+        console.log(this.getProgress() + xrayFailedTest(`❌ ${test._projectId} ❌ ` + test.title) + this.notifyExcluded(issueKey) + ` - ${this.formatDuration(duration)}`)
+    }
+
+    private static printTestSkipped(test: any, duration: number, issueKey?: string) {
+        console.log(this.getProgress() + xrayLog(`⏩ ${test._projectId} ⏩ ` + test.title) + this.notifyExcluded(issueKey))
+    }
+
+    static logTestResult(test: any, result: TestResult, issueKey?: string): void {
+        // const values = ddtParams.map(param => param.value).join(', ')
 
         switch (result.status) {
             case "passed":
-                console.log(xrayPassedTest(`\t✅ ${test._projectId} ✅ ` + coloredOutput) + nonColoredOutput);
-                break;
+                this.printTestSuccess(test, result.duration, issueKey)
+                break
             case "failed":
             case "timedOut":
-                console.log(xrayFailedTest(`\t❌ ${test._projectId} ❌ ` + coloredOutput) + nonColoredOutput);
-                break;
+                this.printTestFail(test, result.duration, issueKey)
+                break
             case "skipped":
-                console.log(`\t⏩ ${test._projectId} ⏩ ` + coloredOutput + nonColoredOutput);
-                break;
+                this.printTestSkipped(test, result.duration, issueKey)
+                break
             default:
-                console.log(coloredOutput + nonColoredOutput);
         }
+
+        this.incrProgress()
+    }
+
+    static log(str: string) {
+        console.log(xrayLog(str))
+    }
+
+    static error(str: string) {
+        console.log(xrayErrorLog(str))
     }
 }
