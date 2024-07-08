@@ -1,4 +1,4 @@
-import { XrayIteration } from "./XrayIterations"
+import { XrayIteration } from "./XrayIteration"
 import { XrayTestInfo } from "./XrayTestInfo"
 import XrayEvidence from "./XrayEvidence"
 import XrayStepResult from "./XrayStepResult"

@@ -5,15 +5,16 @@ import {
 import { parse } from "@babel/parser"
 import * as fs from 'fs'
 import * as path from 'path'
-import { XrayIteration } from './types/Xray/XrayIterations'
-import { XrayParameter } from './types/Xray/XrayParameter'
-import { Logger, xrayErrorLog, xrayLog, xrayWarningLog } from './Logger'
+import { XrayIteration } from './types/Xray/XrayIteration'
+import { Logger } from './Logger'
 import { DDT, Test } from './types/Test'
 import { XrayStepDef } from './types/Xray/XrayStepDef'
 import XrayStepResult from './types/Xray/XrayStepResult'
 import XrayEvidence from './types/Xray/XrayEvidence'
 import { XrayJson } from './types/Xray/XrayJson'
 import XrayService from './XrayService'
+import { z } from "zod"
+import { XrayInfoMultipart } from "./types/Xray/XrayInfoMultipart"
 
 // Constants
 const DDT_TITLE_REGEX: RegExp = /([\w\W]*)\s*->\s*Iteration ([1-9]\d*|1\d+)/
@@ -27,20 +28,31 @@ export enum Status {
     TODO = 'todo',
 }
 
+type Component = { name: string; id: string } | { id: string; name: string };
+
 // Reporter Options Type
 export type ReporterOptions = {
     importType: "MANUAL" | "REST"
-    testExecutionKey?: string
-    project?: string
-    testPlanKey?: string
-    summary?: string
-    description?: string
-    overrideTestDetail?: boolean
-    reportOutDir?: string
-    saveVideoEvidence: boolean,
-    saveTraceEvidence: boolean,
-    xrayClientID: string,
-    xraySecret: string
+    testExecutionKey: string
+    project: string
+    testPlanKey: string
+    newExecution: {
+        assignee: { id: string },
+        issuetype: { name: string } | { id: string }
+        summary: string
+        description?: string
+        components: Component[]
+        requiredFields: [
+            { [field: string]: any }
+        ]
+    }
+    overrideTestDetail: boolean
+    reportOutDir: string
+    saveVideoEvidence: boolean
+    saveTraceEvidence: boolean
+    xrayClientID: string
+    xraySecret: string,
+    debug: boolean
 }
 
 // Evidence Interface
@@ -55,8 +67,10 @@ interface PwEvidence {
  * Implements a custom reporter for integrating test results with Xray, supporting REST and MANUAL import methods.
  */
 export default class XrayPwReporter implements Reporter {
-    private readonly reportPath: string
+    private reportPath: string
+    private infoPath: string
     private xrayReport: XrayJson = { tests: [] }
+    private info = {} as XrayInfoMultipart
     private testMap = new Map<string, Test>()
     private specsCommentsMap = new Map<string, Map<number, string>>()
     private xrayService: XrayService
@@ -66,9 +80,18 @@ export default class XrayPwReporter implements Reporter {
      * @param {ReporterOptions} options - The options for configuring the Xray integrator.
      */
     constructor(private readonly options: ReporterOptions) {
-        this.reportPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xray-pw-reporter/xray-report.json"
+        this.reportPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xray-pw-reporter/results.json"
+        this.infoPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xray-pw-reporter/issueFields.json"
         this.xrayService = new XrayService(options)
-        this.validateOptions()
+
+        try {
+            this.validateOptions()
+        } catch (error) {
+            if (error instanceof Error)
+                Logger.error(error.message)
+
+            process.exit(1)
+        }
     }
 
     /**
@@ -76,43 +99,63 @@ export default class XrayPwReporter implements Reporter {
      * @throws {Error} Will throw an error if any required option is missing or invalid.
      */
     private validateOptions() {
-        const { importType, summary, project, xrayClientID, xraySecret } = this.options
-        process.stdout.write(xrayLog("\n-------------------------------------------------------\n⚡ XRAY-INTEGRATOR -> Checking Options... "))
+        const { importType, project, xrayClientID, xraySecret, testExecutionKey, testPlanKey } = this.options
 
         if (!['REST', 'MANUAL'].includes(importType)) {
-            throw new Error(xrayErrorLog(`⛔️ XRAY-INTEGRATOR -> Provide a valid importing method { importType: "MANUAL" | "REST" }⚡\n-------------------------------------------------------\n`))
+            throw new Error(`\n${"-".repeat(91)}\n ⛔️ XRAY-PW-REPORTER -> Provide a valid importing method { importType: "MANUAL" | "REST" }⚡\n${"-".repeat(91)}\n`)
+        }
+
+        if (!project) {
+            throw new Error(`\n${"-".repeat(93)}\n ⛔️ XRAY-PW-REPORTER -> Provide the project ID in the reporter options: { project: string }⚡\n${"-".repeat(93)}\n`)
         }
 
         if (importType === "REST") {
-            if (!project) {
-                throw new Error(xrayErrorLog("⛔️ XRAY-INTEGRATOR -> Provide the project ID in the reporter options: { project: string }⚡\n-------------------------------------------------------\n"))
-            }
-
             if (!xrayClientID) {
-                throw new Error(xrayErrorLog("⛔️ XRAY-INTEGRATOR -> You selected the REST method, please also provide the CLIENT ID in the reporter options: { xrayClientID: string }⚡\n-------------------------------------------------------\n"))
+                throw new Error(`\n${"-".repeat(139)}\n ⛔️ XRAY-PW-REPORTER -> You selected the REST method, please also provide the CLIENT ID in the reporter options: { xrayClientID: string }⚡\n${"-".repeat(139)}\n`)
             }
 
             if (!xraySecret) {
-                throw new Error(xrayErrorLog("⛔️ XRAY-INTEGRATOR -> You selected the REST method, please also provide the SECRET in the reporter options: { xraySecret: string }⚡\n-------------------------------------------------------\n"))
+                throw new Error(`\n${"-".repeat(134)}\n ⛔️ XRAY-PW-REPORTER -> You selected the REST method, please also provide the SECRET in the reporter options: { xraySecret: string }⚡\n${"-".repeat(134)}\n`)
             }
 
-            if (!summary) {
-                console.log(xrayWarningLog(`⚠️  XRAY-INTEGRATOR -> You didn't provide a summary for the execution in the reporter options: { summary: string }, a default one will be applied`))
+            if (testExecutionKey) {
+                this.xrayReport.testExecutionKey = testExecutionKey
             }
 
-            if (this.options.testExecutionKey) {
-                this.xrayReport.testExecutionKey = this.options.testExecutionKey
-            } else {
-                this.xrayReport.info = {
-                    project: project,
-                    testPlanKey: this.options.testPlanKey,
-                    summary: summary,
-                    description: this.options.description,
+            if (testPlanKey) {
+                if (!this.options.newExecution) {
+                    throw new Error(`\n${"-".repeat(107)}\n ⛔️ XRAY-PW-REPORTER -> In order to import the execution in the plan, please provide newExecution object.⚡\n${"-".repeat(107)}\n`)
                 }
+            }
+
+            if (this.options.newExecution) {
+                if (!this.options.newExecution.summary) {
+                    throw new Error(`⛔️ XRAY-PW-REPORTER -> In order to create a new execution into ${testPlanKey}, please also provide the execution summary in the reporter options.\n`)
+                }
+
+                if (!this.options.newExecution.assignee) {
+                    throw new Error(`⛔️ XRAY-PW-REPORTER -> In order to create a new execution into ${testPlanKey}, please also provide the assignee for the execution in the reporter options.\n`)
+                }
+
+                if (!this.options.newExecution.issuetype) {
+                    throw new Error(`⛔️ XRAY-PW-REPORTER -> In order to create a new execution into ${testPlanKey}, please also provide the execution issue id in the reporter options.\n`)
+                }
+
+                this.info.xrayFields = { testPlanKey: testPlanKey }
+                this.info.fields = {
+                    assignee: this.options.newExecution.assignee,
+                    issuetype: this.options.newExecution.issuetype,
+                    project: { key: this.options.project },
+                    summary: this.options.newExecution.summary
+                }
+
+                // Pushing mandatory
+                if (this.options.newExecution.requiredFields)
+                    Object.assign(this.info.fields, this.options.newExecution.requiredFields[0])
             }
         }
 
-        console.log(xrayLog("Options OK.⚡\n-------------------------------------------------------"))
+        Logger.log(`\n${"-".repeat(56)}\n⚡ XRAY-PW-REPORTER -> Checking Options... Options OK.⚡\n${"-".repeat(56)}`)
     }
 
     /**
@@ -121,25 +164,48 @@ export default class XrayPwReporter implements Reporter {
      * @returns {XrayIteration[] | undefined} The iterations of the test case if successful, undefined if an error occurs.
      */
     private readTestDataset(testKey: string): XrayIteration[] | undefined {
-        const filePath = `data/datasets/${testKey}.dataset.json`
+        const fullPath = path.dirname(__dirname)
+        const regexResp = /^(.*?)node_modules/.exec(fullPath)
+        const appRoot = regexResp ? regexResp[1] : ""
+
+        const filePath = path.join(appRoot, 'data', 'datasets', `${testKey}.dataset.json`)
         try {
             const json = fs.readFileSync(filePath, 'utf8')
             return JSON.parse(json).dataset
         } catch (error) {
-            console.error(xrayErrorLog(`Error while reading dataset for TestCase: ${testKey} - ${error}`))
+            Logger.error(`Error while reading dataset for TestCase: ${testKey} - ${error}`)
             return undefined
         }
     }
 
-    /**
-     * Extracts the summary description from the test case title.
-     * @param {TestCase} test - The test case object.
-     * @returns {string} The extracted test summary.
-     */
-    private extractTestSummary(test: TestCase): string {
-        const match = test.title.match(DDT_TITLE_REGEX)
+    private validateDataset(testKey: string) {
+        const fullPath = path.dirname(__dirname)
+        const regexResp = /^(.*?)node_modules/.exec(fullPath)
+        const appRoot = regexResp ? regexResp[1] : ""
 
-        return match ? match[1].trim() : test.title
+        const filePath = path.join(appRoot, 'data', 'datasets', `${testKey}.dataset.json`)
+
+        const parameterSchema = z.object({
+            name: z.string(),
+            value: z.string(),
+        })
+
+        const datasetSchema = z.object({
+            dataset: z.array(z.object({
+                parameters: z.array(parameterSchema),
+            })),
+        })
+
+        try {
+            const fileContent = fs.readFileSync(filePath, 'utf8')
+            const jsonData = JSON.parse(fileContent)
+
+            datasetSchema.parse(jsonData)
+
+            return true
+        } catch (error) {
+            return false
+        }
     }
 
     /**
@@ -149,7 +215,31 @@ export default class XrayPwReporter implements Reporter {
      */
     private extractTestKey(test: TestCase): string | undefined {
         const comments = this.getTestComments(test.location.file, test)
-        return comments?.DDT || comments?.JiraIssue
+
+        if (!comments)
+            return undefined
+
+        return comments.JiraIssue
+    }
+
+    private extractDDTKey(test: TestCase): string | undefined {
+        const comments = this.getTestComments(test.location.file, test)
+
+        if (!comments)
+            return undefined
+
+        return comments.DDT
+    }
+
+    /**
+     * Extracts the summary description from the test case title.
+     * @param {TestCase} test - The test case object.
+     * @returns {string} The extracted test summary.
+     */
+    private extractDDTSummary(test: TestCase): string {
+        const match = test.title.match(DDT_TITLE_REGEX)
+
+        return match ? match[1].trim() : test.title
     }
 
     /**
@@ -160,7 +250,7 @@ export default class XrayPwReporter implements Reporter {
     private extractIterationNumber(test: TestCase): number | undefined {
         const match = test.title.match(DDT_TITLE_REGEX)
 
-        return match ? parseInt(match[2]) : undefined
+        return match ? parseInt(match[2]) - 1 : undefined
     }
 
     /**
@@ -209,7 +299,7 @@ export default class XrayPwReporter implements Reporter {
      * @param {Test} test - The test object representing a data-driven test.
      * @returns {string} The status of the data-driven test.
      */
-    private determineDDTStatus(test: Test): string {
+    private determineDDTStatus(test: DDT): string {
         const iterations = test.xrayTest.iterations
 
         if (iterations) {
@@ -223,7 +313,7 @@ export default class XrayPwReporter implements Reporter {
                 return Status.EXECUTING
         }
 
-        return Status.TODO
+        return Status.PASSED
     }
 
     /**
@@ -309,166 +399,204 @@ export default class XrayPwReporter implements Reporter {
         try {
             fs.mkdirSync(path.dirname(this.reportPath), { recursive: true })
             fs.writeFileSync(this.reportPath, JSON.stringify(this.xrayReport, null, 2), 'utf8')
-            console.log(xrayLog(`⚡ XRAY-INTEGRATOR -> Creating xray-report... report saved to '${this.reportPath}'⚡`))
+            Logger.log(`${"-".repeat(99)}\n⚡ XRAY-PW-REPORTER -> Creating xray-report... report saved to '${this.reportPath}'⚡\n${"-".repeat(99)}`)
         } catch (error) {
             if (error instanceof Error)
-                console.error(xrayErrorLog(`⚡ XRAY-INTEGRATOR -> Error while saving report locally⚡`))
+                Logger.error(`${"-".repeat(57)}\n⚡ XRAY-PW-REPORTER -> Error while saving report locally⚡\n${"-".repeat(57)}`)
         }
     }
 
+    private async saveInfoLocally() {
+        try {
+            fs.mkdirSync(path.dirname(this.infoPath), { recursive: true })
+            fs.writeFileSync(this.infoPath, JSON.stringify(this.info, null, 2), 'utf8')
+        } catch (error) {
+            if (error instanceof Error)
+                Logger.error(`${"-".repeat(57)}\n⚡ XRAY-PW-REPORTER -> Error while saving issueFields locally⚡\n${"-".repeat(57)}`)
+        }
+    }
+
+    private getXrayStatus(pwStatus: string) {
+        switch (pwStatus) {
+            case "passed":
+                return Status.PASSED
+            case "failed":
+            case "timedOut":
+                return Status.FAILED
+            case "skipped":
+            case "interrupted":
+                return Status.TODO
+        }
+    }
 
     // INTERFACE'S METHODS
     async onBegin(config: FullConfig, suite: Suite): Promise<void> {
-        if (this.options.importType == 'REST') {
-            try {
-                await this.xrayService.authenticate()
-            } catch (error) {
-                if (error instanceof Error) {
-                    console.log(error.message)
-                    process.exit(1)
-                }
-            }
+        if (suite.allTests().length == 0) {
+            Logger.log("No tests found.\n")
+            process.exit(0)
         }
 
         this.parsingSpecs(suite)
-        console.log(xrayLog(`Executing ${suite.allTests().length} tests...\n`))
+        Logger.totalTestsNumber = suite.allTests().length
+        Logger.log(`Executing ${suite.allTests().length} tests...\n`)
+    }
+
+    async onTestBegin(test: TestCase, result: TestResult) {
+        const testKey = this.extractTestKey(test)
+        const ddtKey = this.extractDDTKey(test)
+
+        const saveNewTest = (key: string, isDDT: boolean) => {
+            const newTest = isDDT ? new DDT(key) : new Test(key)
+
+            newTest.xrayTest.testKey = key
+
+            // TestInfo
+            if (this.options.overrideTestDetail) {
+                newTest.xrayTest.testInfo = {
+                    type: "Manual",
+                    projectKey: this.options.project,
+                    summary: isDDT ? this.extractDDTSummary(test) : test.title,
+                }
+            }
+
+            this.testMap.set(key, newTest)
+        }
+
+        if (testKey) {
+            saveNewTest(testKey, false)
+        }
+
+        if (ddtKey && this.isTestDDT(test)) {
+            if (this.validateDataset(ddtKey) && !this.testMap.has(ddtKey)) {
+                saveNewTest(ddtKey, true)
+            }
+        }
+    }
+
+    async onTestEnd(test: TestCase, result: TestResult) {
+        const testKey = this.extractTestKey(test)
+        const ddtKey = this.extractDDTKey(test)
+
+        const updateTestDetails = async (testMapped: Test) => {
+            if (testMapped) {
+                if (!(testMapped instanceof DDT))
+                    testMapped.xrayTest.status = this.getXrayStatus(result.status)
+
+                testMapped.xrayTest.evidence = await this.extractEvidences(result.attachments)
+            }
+        }
+
+        if (testKey) {
+            const testMapped = this.testMap.get(testKey)!
+            await updateTestDetails(testMapped)
+        }
+
+        if (ddtKey && this.isTestDDT(test)) {
+            const testMapped = this.testMap.get(ddtKey)!
+
+            // Save iteration for tests without steps
+            const iterationNumber = this.extractIterationNumber(test)!
+
+            if (!testMapped.xrayTest.iterations) {
+                testMapped.xrayTest.iterations = []
+            }
+
+            if (!testMapped.xrayTest.iterations[iterationNumber]) {
+                // First time this iteration runs
+                testMapped.xrayTest.iterations[iterationNumber] = {
+                    status: result.status,
+                    steps: [],
+                    parameters: this.readTestDataset(ddtKey)![iterationNumber].parameters
+                }
+            }
+
+            await updateTestDetails(testMapped)
+        }
+
+        Logger.logTestResult(test, result, testKey || (this.isTestDDT(test) ? ddtKey : undefined))
     }
 
     async onStepEnd(test: TestCase, result: TestResult, step: TestStep): Promise<void> {
-        const testSummary = this.extractTestSummary(test)
         const testKey = this.extractTestKey(test)
-        const iterationNumber = this.extractIterationNumber(test)!
-        const isDDT = this.isTestDDT(test)
-        const TestClass = isDDT ? DDT : Test
-        let dataset: XrayIteration[] | undefined
+        const ddtKey = this.extractDDTKey(test)
+
+        if (!(step.category == "test.step"))
+            return
 
         const newStepResult: XrayStepResult = {
             status: step.error ? Status.FAILED : Status.PASSED,
             actualResult: step.error ? step.error.message : "OK",
         }
 
-        // Manage step only if test.step
-        if (testKey && step.category === "test.step") {
-            const testMapped = this.testMap.get(testKey) || new TestClass(testKey)
+        const newStepDef: XrayStepDef = {
+            action: step.title,
+            data: "",
+            result: "",
+        }
 
-            if (isDDT) {
-                dataset = this.readTestDataset(testKey)
-
-                if (dataset) {
-                    if (!testMapped.xrayTest.iterations) {
-                        testMapped.xrayTest.iterations = [] as XrayIteration[]
-                    }
-
-                    if (!testMapped.xrayTest.iterations[iterationNumber - 1]) {
-                        testMapped.xrayTest.iterations[iterationNumber - 1] = {
-                            steps: [newStepResult]
-                        }
-                    } else {
-                        testMapped.xrayTest.iterations[iterationNumber - 1].steps?.push(newStepResult)
-                    }
-                }
+        const addStepResult = (testMapped: Test) => {
+            if (testMapped.xrayTest.steps) {
+                testMapped.xrayTest.steps.push(newStepResult)
             } else {
-                // Getting test mapped if exist, create it otherwise
-                if (!testMapped.xrayTest.steps) {
-                    testMapped.xrayTest.steps = [newStepResult]
-                } else {
-                    testMapped.xrayTest.steps.push(newStepResult)
-                }
+                testMapped.xrayTest.steps = [newStepResult]
             }
+        }
 
-            this.testMap.set(testKey, testMapped)
-
-            // If override defined, init testInfo and push step def
+        const addStepDef = (testMapped: Test) => {
             if (this.options.overrideTestDetail) {
-
-                // New Step Def
-                const newStep: XrayStepDef = {
-                    action: step.title,
-                    data: '',
-                    result: '',
-                }
-
-                if (!testMapped.xrayTest.testInfo || !testMapped.xrayTest.testInfo.steps) {
-                    testMapped.xrayTest.testInfo = {
-                        type: 'Manual',
-                        projectKey: this.options.project,
-                        summary: testSummary,
-                        steps: [newStep] as XrayStepDef[],
-                    }
+                if (!testMapped.xrayTest.testInfo!.steps) {
+                    testMapped.xrayTest.testInfo!.steps = [newStepDef]
                 } else {
-                    // Check if the step definition already exists
-                    const stepDefExists = testMapped.xrayTest.testInfo.steps.some(existingStep =>
-                        existingStep.action === newStep.action
+                    // Pushing new stepDef if not exist
+                    const stepDefExists = testMapped.xrayTest.testInfo!.steps.some(existingStep =>
+                        existingStep.action === newStepDef.action
                     )
 
                     if (!stepDefExists) {
-                        testMapped.xrayTest.testInfo.steps.push(newStep)
+                        testMapped.xrayTest.testInfo!.steps.push(newStepDef)
                     }
                 }
-
-                this.testMap.set(testKey, testMapped)
             }
         }
-    }
-
-    async onTestEnd(test: TestCase, result: TestResult) {
-        const testSummary = this.extractTestSummary(test)
-        const testKey = this.extractTestKey(test)
-        const iterationNumber = this.extractIterationNumber(test)
-        const isDDT = this.isTestDDT(test)
-        const TestClass = isDDT ? DDT : Test
-
-        let ddtParameters: XrayParameter[] | undefined
-        let testMapped
 
         if (testKey) {
-            testMapped = this.testMap.get(testKey) || new TestClass(testKey)
-
-            if (isDDT) {
-                const dataset = this.readTestDataset(testKey)
-                if (dataset) {
-                    ddtParameters = dataset[iterationNumber! - 1]?.parameters
-
-                    if (!testMapped.xrayTest.iterations) {
-                        testMapped.xrayTest.iterations = []
-                    }
-
-                    if (ddtParameters) {
-                        testMapped.xrayTest.iterations[iterationNumber! - 1] = {
-                            parameters: ddtParameters,
-                            status: result.status,
-                        }
-                    }
-                }
-            } else {
-                testMapped = this.testMap.get(testKey) || new Test(testKey)
-                testMapped.xrayTest.status = result.status
+            const testMapped = this.testMap.get(testKey)
+            if (testMapped) {
+                addStepResult(testMapped)
+                addStepDef(testMapped)
             }
-
-            if (result.error && result.attachments && result.attachments.length > 0) {
-                testMapped.xrayTest.evidence = await this.extractEvidences(result.attachments)
-            }
-
-            testMapped.xrayTest.status = result.status
-
-            if (this.options.overrideTestDetail) {
-                if (!testMapped.xrayTest.testInfo) {
-                    testMapped.xrayTest.testInfo = {
-                        type: 'Manual',
-                        projectKey: this.options.project,
-                        summary: testSummary,
-                    }
-                }
-            }
-
-            this.testMap.set(testKey, testMapped)
         }
 
-        Logger.logTestResult(test, result, this.getTestComments(test.location.file, test), ddtParameters)
+        if (ddtKey && this.isTestDDT(test)) {
+            const testMapped = this.testMap.get(ddtKey)
+            if (testMapped) {
+                const iterationNumber = this.extractIterationNumber(test)!
+
+                if (!testMapped.xrayTest.iterations) {
+                    testMapped.xrayTest.iterations = []
+                }
+
+                if (!testMapped.xrayTest.iterations[iterationNumber]) {
+                    // First time this iteration runs
+                    testMapped.xrayTest.iterations[iterationNumber] = {
+                        steps: [newStepResult],
+                        parameters: this.readTestDataset(ddtKey)![iterationNumber].parameters
+                    }
+                } else {
+                    // Iteration already present, just push step result
+                    testMapped.xrayTest.iterations[iterationNumber].steps.push(newStepResult)
+                }
+
+                // Updating iteration status
+                testMapped.xrayTest.iterations[iterationNumber].status = step.error ? Status.FAILED : Status.PASSED
+
+                addStepDef(testMapped)
+            }
+        }
     }
 
     async onEnd(result: FullResult) {
-        console.log(xrayLog("\nExecution done.\n\n"))
+        Logger.log("\nExecution done.\n")
 
         if (!interrupted) {
             for (const [, test] of this.testMap.entries()) {
@@ -479,18 +607,25 @@ export default class XrayPwReporter implements Reporter {
             }
 
             // Saving report locally
-            await this.saveReportLocally()
+            if (this.xrayReport.tests.length > 0 && (this.options.importType == "MANUAL" || this.options.debug)) {
+                await this.saveReportLocally()
+                await this.saveInfoLocally()
+            }
 
             if (this.options.importType == "REST") {
                 try {
-                    await this.xrayService.uploadExecution(this.xrayReport)
+                    await this.xrayService.authenticate()
+
+                    if (!this.options.testPlanKey && (this.options.testExecutionKey && !this.options.newExecution))
+                        await this.xrayService.uploadExecution(this.xrayReport)
+                    else
+                        await this.xrayService.uploadMultipartExec(this.info, this.xrayReport)
                 } catch (error) {
                     if (error instanceof Error) {
-                        console.log(error.message)
+                        Logger.error(error.message)
                     }
                 }
-            } else
-                console.log(xrayLog("created successfully.⚡"))
+            }
         }
     }
 }
