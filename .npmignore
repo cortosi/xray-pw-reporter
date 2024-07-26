@@ -1,0 +1,41 @@
+# Ignore node_modules
+node_modules/
+
+# Sources
+src/
+
+# Ignore log files
+*.log
+
+# Ignore development configuration files
+*.local
+*.env
+.env.*
+
+# Ignore build directories
+dist
+build
+
+# Ignore documentation
+docs
+*.md
+
+# Ignore tests
+test
+tests
+*.spec.js
+
+# Ignore IDE-specific configuration files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore OS-specific configuration files
+.DS_Store
+Thumbs.db
+
+# Ignore other specific configuration files
+tsconfig.json
+*.config.js
+*.config.json

@@ -1,9 +1,9 @@
 // import { test } from "@playwright/test"
-import { dataset as ds110 } from "../data/datasets/prov-110.dataset.json"
-import { dataset as ds111 } from "../data/datasets/prov-111.dataset.json"
-import { dataset as ds112 } from "../data/datasets/prov-112.dataset.json"
-import { dataset as ds113 } from "../data/datasets/prov-113.dataset.json"
-import { test } from "@playwright/test"
+import { dataset as ds110 } from "../data/datasets/prov-8.dataset.json"
+import { dataset as ds111 } from "../data/datasets/prov-9.dataset.json"
+import { dataset as ds112 } from "../data/datasets/prov-10.dataset.json"
+import { dataset as ds113 } from "../data/datasets/prov-11.dataset.json"
+import { expect, test } from "@playwright/test"
 
 test.describe('', { tag: "@testxray" }, () => {
     test.beforeEach(async ({ page }) => {
@@ -11,14 +11,28 @@ test.describe('', { tag: "@testxray" }, () => {
     })
 
     /**
-     * @JiraIssue PROV-105
+     * @JiraIssue PROV-2
+     */
+    test('Test with step loops', async ({ page }) => {
+        await test.step('Validation', async () => {
+            await expect.poll(async () => {
+                await test.step('Step Loop', async () => {
+
+                })
+                return 0
+            }).toBe(1)
+        })
+    })
+
+    /**
+     * @JiraIssue PROV-3
      */
     test('Test that passes without steps', async ({ page }) => {
         // No steps defined
     })
 
     /**
-     * @JiraIssue PROV-106
+     * @JiraIssue PROV-4
      */
     test('Test that passes with a single step', async ({ page }) => {
         await test.step('Step 1', async () => {
@@ -27,7 +41,7 @@ test.describe('', { tag: "@testxray" }, () => {
     })
 
     /**
-     * @JiraIssue PROV-107
+     * @JiraIssue PROV-5
      */
     test('Test that passes with multiple steps', async ({ page }) => {
         await test.step('Step 1', async () => {
@@ -39,14 +53,14 @@ test.describe('', { tag: "@testxray" }, () => {
     })
 
     /**
-     * @JiraIssue PROV-108
+     * @JiraIssue PROV-6
      */
     test('Test that fails without steps', async ({ page }) => {
         throw new Error('Test error')
     })
 
     /**
-     * @JiraIssue PROV-109
+     * @JiraIssue PROV-7
      */
     test('Test with one passing step and one failing step', async ({ page }) => {
         await test.step('Step 1', async () => {
@@ -59,7 +73,7 @@ test.describe('', { tag: "@testxray" }, () => {
 
     test.describe.serial(() => {
         /**
-         * @JiraIssue PROV-114
+         * @JiraIssue PROV-12
          */
         test('Serial test that passes (1)', async ({ page }) => {
             await test.step('Step 1', async () => {
@@ -69,7 +83,7 @@ test.describe('', { tag: "@testxray" }, () => {
         })
 
         /**
-         * @JiraIssue PROV-115
+         * @JiraIssue PROV-13
          */
         test('Serial test that fails (2)', async ({ page }) => {
             await test.step('Step 1', async () => {
@@ -78,7 +92,7 @@ test.describe('', { tag: "@testxray" }, () => {
         })
 
         /**
-         * @JiraIssue PROV-116
+         * @JiraIssue PROV-14
          */
         test('Serial test that it is skipped due previous failure (3)', async ({ page }) => {
             await test.step('Step 1', async () => {
@@ -90,7 +104,7 @@ test.describe('', { tag: "@testxray" }, () => {
     // DDTS
     ds110.forEach((item, index) => {
         /**
-         * @DDT PROV-110
+         * @DDT PROV-8
          */
         test(`Data-driven test that passes without steps -> Iteration ${index + 1}`, async ({ page }) => {
             // No steps defined
@@ -99,7 +113,7 @@ test.describe('', { tag: "@testxray" }, () => {
 
     ds111.forEach((item, index) => {
         /**
-         * @DDT PROV-111
+         * @DDT PROV-9
          */
         test(`Data-driven test with a single step -> Iteration ${index + 1}`, async ({ page }) => {
             await test.step('Step 1', async () => {
@@ -110,7 +124,7 @@ test.describe('', { tag: "@testxray" }, () => {
 
     ds112.forEach((item, index) => {
         /**
-         * @DDT PROV-112
+         * @DDT PROV-10
          */
         test(`Data-driven test with multiple steps -> Iteration ${index + 1}`, async ({ page }) => {
             await test.step('Step 1', async () => {
@@ -124,7 +138,7 @@ test.describe('', { tag: "@testxray" }, () => {
 
     ds113.forEach((item, index) => {
         /**
-         * @DDT PROV-113
+         * @DDT PROV-11
          */
         test(`Data-driven test with mixed iterations (2 fails) -> Iteration ${index + 1}`, async ({ page }) => {
             await test.step('Step 1', async () => {

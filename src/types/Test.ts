@@ -2,6 +2,7 @@ import { XrayTest } from "./Xray/XrayTest"
 
 export class Test {
     private _testKey: string
+    private _steps: string[] = []
     protected _testType: string
 
     private _xrayTest: XrayTest = {}
@@ -21,6 +22,14 @@ export class Test {
 
     get testType(): string {
         return this._testType
+    }
+
+    containStep(title: string): boolean {
+        return this._steps.includes(title)
+    }
+
+    saveStep(title: string): void {
+        this._steps.push(title)
     }
 }
 

@@ -520,7 +520,8 @@ export default class XrayPwReporter implements Reporter {
         const testKey = this.extractTestKey(test)
         const ddtKey = this.extractDDTKey(test)
 
-        if (!(step.category == "test.step"))
+        // Return if not step or step nested
+        if (!(step.category == "test.step") || step.parent)
             return
 
         const newStepResult: XrayStepResult = {
@@ -561,15 +562,16 @@ export default class XrayPwReporter implements Reporter {
 
         if (testKey) {
             const testMapped = this.testMap.get(testKey)
-            if (testMapped) {
+            if (testMapped && !testMapped.containStep(step.title)) {
                 addStepResult(testMapped)
                 addStepDef(testMapped)
+                testMapped.saveStep(step.title)
             }
         }
 
         if (ddtKey && this.isTestDDT(test)) {
             const testMapped = this.testMap.get(ddtKey)
-            if (testMapped) {
+            if (testMapped && !testMapped.containStep(step.title)) {
                 const iterationNumber = this.extractIterationNumber(test)!
 
                 if (!testMapped.xrayTest.iterations) {
@@ -591,6 +593,7 @@ export default class XrayPwReporter implements Reporter {
                 testMapped.xrayTest.iterations[iterationNumber].status = step.error ? Status.FAILED : Status.PASSED
 
                 addStepDef(testMapped)
+                testMapped.saveStep(step.title)
             }
         }
     }
