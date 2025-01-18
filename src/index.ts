@@ -38,6 +38,7 @@ export type ReporterOptions = {
     testPlanKey: string
     newExecution: {
         assignee: { id: string },
+        reporter: { id: string },
         issuetype: { name: string } | { id: string }
         summary: string
         description?: string
@@ -52,6 +53,7 @@ export type ReporterOptions = {
     saveTraceEvidence: boolean
     xrayClientID: string
     xraySecret: string,
+    executedBy: string,
     debug: boolean
 }
 
@@ -144,6 +146,7 @@ export default class XrayPwReporter implements Reporter {
                 this.info.xrayFields = { testPlanKey: testPlanKey }
                 this.info.fields = {
                     assignee: this.options.newExecution.assignee,
+                    reporter: this.options.newExecution.reporter,
                     issuetype: this.options.newExecution.issuetype,
                     project: { key: this.options.project },
                     summary: this.options.newExecution.summary
@@ -449,6 +452,9 @@ export default class XrayPwReporter implements Reporter {
             const newTest = isDDT ? new DDT(key) : new Test(key)
 
             newTest.xrayTest.testKey = key
+
+            // Setting up the "Executed By" field
+            newTest.xrayTest.executedBy = this.options.executedBy
 
             // TestInfo
             if (this.options.overrideTestDetail) {

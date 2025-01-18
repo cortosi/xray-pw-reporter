@@ -35,11 +35,18 @@ reporter: [
       // the reporter will try to import the execution into the key defined on testExecutionKey
       testPlanKey: "JKEY-100",
 
+      // The user ID representing who executed the test run. 
+      // This is a global setting, meaning every test in the run will be marked as executed by this user.
+      executedBy: "712040:aa4a7b1c-ce1b-4114-a079-e7e2bf90afec",
+
       // This object describes how the new Execution Issue will be created (unlike testExecutionKey, this field allows you to describe all the fields of the new execution)
       // The new execution will be imported and linked to the plan defined in testPlanKey, 
       // if testPlanKey is not defined, it will only be imported as a new execution and will not be linked
       newExecution: {
         "assignee": {
+          "id": "712040:aa4a7b1c-ce1b-4114-a079-e7e2bf90afec"
+        },
+        "reporter": {
           "id": "712040:aa4a7b1c-ce1b-4114-a079-e7e2bf90afec"
         },
         "issuetype": {
