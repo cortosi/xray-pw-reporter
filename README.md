@@ -1,6 +1,6 @@
 ## Usage/Examples
 ```typescript
-rreporter: [
+reporter: [
   [
     "xray-pw-reporter",
     {
