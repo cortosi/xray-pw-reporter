@@ -15,6 +15,10 @@ import { XrayJson } from './types/Xray/XrayJson'
 import XrayService from './XrayService'
 import { z } from "zod"
 import { XrayInfoMultipart } from "./types/Xray/XrayInfoMultipart"
+import MSTeamsWebhookService from "./MSTeamsWebhookService"
+import { TeamsWebhookData } from "./types/ms/TeamsWebhookData"
+import { ReporterOptions } from "./types/ReporterOptions"
+import { ExecutionMetrics } from "./ExecutionMetrics"
 
 // Constants
 const DDT_TITLE_REGEX: RegExp = /([\w\W]*)\s*->\s*Iteration ([1-9]\d*|1\d+)/
@@ -26,35 +30,6 @@ export enum Status {
     SKIPPED = 'skipped',
     EXECUTING = 'executing',
     TODO = 'todo',
-}
-
-type Component = { name: string; id: string } | { id: string; name: string };
-
-// Reporter Options Type
-export type ReporterOptions = {
-    importType: "MANUAL" | "REST"
-    testExecutionKey: string
-    project: string
-    testPlanKey: string
-    newExecution: {
-        assignee: { id: string },
-        reporter: { id: string },
-        issuetype: { name: string } | { id: string }
-        summary: string
-        description?: string
-        components: Component[]
-        requiredFields: [
-            { [field: string]: any }
-        ]
-    }
-    overrideTestDetail: boolean
-    reportOutDir: string
-    saveVideoEvidence: boolean
-    saveTraceEvidence: boolean
-    xrayClientID: string
-    xraySecret: string,
-    executedBy: string,
-    debug: boolean
 }
 
 // Evidence Interface
@@ -77,6 +52,13 @@ export default class XrayPwReporter implements Reporter {
     private specsCommentsMap = new Map<string, Map<number, string>>()
     private xrayService: XrayService
 
+    // MS Teams Webhook Integration
+    private msTeamsWebhookService: MSTeamsWebhookService
+    private webhookData: TeamsWebhookData = {
+        jiraIssue: { executionSummary: "", link: "" },
+        results: { executed: "", passed: "", failed: "", skipped: "", runtime: "" }
+    }
+
     /**
      * Creates an instance of XrayPwReporter.
      * @param {ReporterOptions} options - The options for configuring the Xray integrator.
@@ -85,6 +67,7 @@ export default class XrayPwReporter implements Reporter {
         this.reportPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xray-pw-reporter/results.json"
         this.infoPath = options.reportOutDir ? `${options.reportOutDir}/xray-report.json` : "xray-pw-reporter/issueFields.json"
         this.xrayService = new XrayService(options)
+        this.msTeamsWebhookService = new MSTeamsWebhookService(options)
 
         try {
             this.validateOptions()
@@ -120,14 +103,12 @@ export default class XrayPwReporter implements Reporter {
                 throw new Error(`\n${"-".repeat(134)}\n ⛔️ XRAY-PW-REPORTER -> You selected the REST method, please also provide the SECRET in the reporter options: { xraySecret: string }⚡\n${"-".repeat(134)}\n`)
             }
 
-            if (testExecutionKey) {
+            if (testExecutionKey && !this.options.newExecution) {
                 this.xrayReport.testExecutionKey = testExecutionKey
             }
 
-            if (testPlanKey) {
-                if (!this.options.newExecution) {
-                    throw new Error(`\n${"-".repeat(107)}\n ⛔️ XRAY-PW-REPORTER -> In order to import the execution in the plan, please provide newExecution object.⚡\n${"-".repeat(107)}\n`)
-                }
+            if (testPlanKey && !this.options.newExecution) {
+                throw new Error(`\n${"-".repeat(107)}\n ⛔️ XRAY-PW-REPORTER -> In order to import the execution into the test plan, please provide newExecution object.⚡\n${"-".repeat(107)}\n`)
             }
 
             if (this.options.newExecution) {
@@ -151,6 +132,9 @@ export default class XrayPwReporter implements Reporter {
                     project: { key: this.options.project },
                     summary: this.options.newExecution.summary
                 }
+
+                // MS
+                this.webhookData.jiraIssue.executionSummary = this.options.newExecution.summary
 
                 // Pushing mandatory
                 if (this.options.newExecution.requiredFields)
@@ -477,6 +461,9 @@ export default class XrayPwReporter implements Reporter {
                 saveNewTest(ddtKey, true)
             }
         }
+
+        // Updating metrics
+        ExecutionMetrics.executed++
     }
 
     async onTestEnd(test: TestCase, result: TestResult) {
@@ -519,6 +506,10 @@ export default class XrayPwReporter implements Reporter {
             await updateTestDetails(testMapped)
         }
 
+        // Updating Metrics
+        ExecutionMetrics.updateMetrics(result)
+
+        // Logging
         Logger.logTestResult(test, result, testKey || (this.isTestDDT(test) ? ddtKey : undefined))
     }
 
@@ -605,6 +596,7 @@ export default class XrayPwReporter implements Reporter {
     }
 
     async onEnd(result: FullResult) {
+        let jiraIssueLink: string = ""
         Logger.log("\nExecution done.\n")
 
         if (!interrupted) {
@@ -626,10 +618,29 @@ export default class XrayPwReporter implements Reporter {
                     await this.xrayService.authenticate()
 
                     if (!this.options.testPlanKey && (this.options.testExecutionKey && !this.options.newExecution))
-                        await this.xrayService.uploadExecution(this.xrayReport)
+                        jiraIssueLink = await this.xrayService.uploadExecution(this.xrayReport)
                     else
-                        await this.xrayService.uploadMultipartExec(this.info, this.xrayReport)
+                        jiraIssueLink = await this.xrayService.uploadMultipartExec(this.info, this.xrayReport)
                 } catch (error) {
+                    if (error instanceof Error) {
+                        Logger.error(error.message)
+                    }
+                }
+            }
+
+            // MSTeams Webhook
+            this.webhookData.jiraIssue.link = jiraIssueLink
+            this.webhookData.results.executed = ExecutionMetrics.executed.toString()
+            this.webhookData.results.passed = ExecutionMetrics.passed.toString()
+            this.webhookData.results.failed = ExecutionMetrics.failed.toString()
+            this.webhookData.results.skipped = ExecutionMetrics.skipped.toString()
+            this.webhookData.results.runtime = formatRunTime(result.duration)
+
+            if (this.options.useTeamsWebhook && this.options.teamsWebhook) {
+                try {
+                    await this.msTeamsWebhookService.sendWebhookData(this.webhookData)
+                }
+                catch (error) {
                     if (error instanceof Error) {
                         Logger.error(error.message)
                     }
@@ -642,3 +653,17 @@ export default class XrayPwReporter implements Reporter {
 process.addListener("SIGINT", () => {
     interrupted = true
 })
+
+function formatRunTime(milliseconds: number): string {
+    if (milliseconds < 0) {
+        throw new Error("Il tempo in millisecondi non può essere negativo.")
+    }
+
+    const seconds = Math.floor(milliseconds / 1000) % 60
+    const minutes = Math.floor(milliseconds / (1000 * 60))
+
+    const formattedMinutes = minutes > 0 ? `${minutes}m ` : ""
+    const formattedSeconds = `${seconds}s`;
+
+    return `${formattedMinutes}${formattedSeconds}`.trim()
+}
